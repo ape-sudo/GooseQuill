@@ -25,7 +25,8 @@ pub fn build(b: *std.Build) void {
     });
 
     root_module.linkSystemLibrary("c", .{});
-    root_module.linkSystemLibrary("SDL2", .{});
+    root_module.linkSystemLibrary("SDL3", .{});
+    root_module.linkSystemLibrary("SDL3_ttf", .{});
 
     b.installArtifact(exe);
 }

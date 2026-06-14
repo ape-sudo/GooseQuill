@@ -1,5 +1,9 @@
 const std = @import("std");
-const sdl = @cImport(@cInclude("SDL2/SDL.h"));
+pub const c = @cImport({
+    @cInclude("SDL3/SDL.h");
+    @cInclude("SDL3_ttf/SDL_ttf.h");
+});
+// pub const c = @cImport(@cInclude("SDL3_ttf/SDL_ttf.h"));
 
 const gq = @import("GooseQuill");
 
@@ -9,41 +13,70 @@ pub fn main() u8 {
     const WIDTH = 800;
     const HEIGHT = 600;
 
-    if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
-        std.debug.print("CANNOT INIT SDL\n", .{});
+    if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
+        std.debug.print("CANNOT INIT SDL: {s}\n", .{c.SDL_GetError()});
         return 1;
     }
 
-    const window = sdl.SDL_CreateWindow(
-        "GooseQuill",
-        sdl.SDL_WINDOWPOS_CENTERED,
-        sdl.SDL_WINDOWPOS_CENTERED,
-        WIDTH,
-        HEIGHT,
-        sdl.SDL_WINDOW_SHOWN,
-    );
+    const window = c.SDL_CreateWindow("GooseQuill", WIDTH, HEIGHT, 0);
 
     if (window == null) {
+        std.debug.print("CANNOT CREATE WINDOW\n", .{});
         return 1;
     }
 
-    const renderer = sdl.SDL_CreateRenderer(window, -1, sdl.SDL_RENDERER_PRESENTVSYNC);
+    const renderer = c.SDL_CreateRenderer(window, null);
 
     if (renderer == null) {
-        std.debug.print("CANNOT CREATE REDNERED", .{});
+        std.debug.print("CANNOT CREATE REDNERED\n", .{});
         return 1;
     }
+
+    const font_path = "main_font.ttf";
+
+    if (!c.TTF_Init()) {
+        std.debug.print("TTF_Init failed: {s}\n", .{c.SDL_GetError()});
+        return 1;
+    }
+
+    const font = c.TTF_OpenFont(font_path, 22);
+    if (font == null) {
+        std.debug.print("TTF_OpenFont failed: {s}\n", .{c.SDL_GetError()});
+        return 1;
+    }
+
+    const surface = c.TTF_RenderText_Blended(font, "Hello World", 0, .{ .r = 255, .g = 255, .b = 255, .a = 255 });
+
+    const texture = c.SDL_CreateTextureFromSurface(renderer, surface);
+
+    const rect_dst: c.SDL_FRect = .{ .x = 10, .y = 10, .w = @floatFromInt(surface.*.w), .h = @floatFromInt(surface.*.h) };
 
     var window_should_close: bool = false;
 
     while (!window_should_close) {
-        var event: sdl.SDL_Event = undefined;
-        while (sdl.SDL_PollEvent(&event) != 0) {
-            if (event.type == sdl.SDL_QUIT) {
+        var event: c.SDL_Event = undefined;
+        while (c.SDL_PollEvent(&event)) {
+            if (event.type == c.SDL_EVENT_QUIT) {
                 window_should_close = true;
             }
         }
+
+        _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        _ = c.SDL_RenderClear(renderer);
+
+        _ = c.SDL_RenderTexture(renderer, texture, null, &rect_dst);
+
+        _ = c.SDL_RenderPresent(renderer);
     }
 
+    c.SDL_DestroyTexture(texture);
+    c.SDL_DestroySurface(surface);
+    c.TTF_CloseFont(font);
+
+    c.SDL_DestroyRenderer(renderer);
+    c.SDL_DestroyWindow(window);
+
+    c.TTF_Quit();
+    c.SDL_Quit();
     return 0;
 }
