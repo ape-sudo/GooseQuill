@@ -1,14 +1,48 @@
 const std = @import("std");
 const SDL = @import("./sdl.zig").SDL;
 
-pub fn draw(renderer: *SDL.SDL_Renderer, font: *SDL.TTF_Font) void {
-    const surface = SDL.TTF_RenderText_Blended(font, "Hello World", 0, .{ .r = 255, .g = 255, .b = 255, .a = 255 });
-    defer SDL.SDL_DestroySurface(surface);
+pub const Editor = struct {
+    allocator: std.mem.Allocator,
+    buffer: std.ArrayList(u8),
 
-    const texture = SDL.SDL_CreateTextureFromSurface(renderer, surface);
-    defer SDL.SDL_DestroyTexture(texture);
+    pub fn init(allocator: std.mem.Allocator) !Editor {
+        var buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        try buffer.append(allocator, 0);
+        return Editor{ .buffer = buffer, .allocator = allocator };
+    }
 
-    const rect_dst: SDL.SDL_FRect = .{ .x = 0, .y = 0, .w = @floatFromInt(surface.*.w), .h = @floatFromInt(surface.*.h) };
+    pub fn draw(self: *Editor, renderer: *SDL.SDL_Renderer, font: *SDL.TTF_Font) !void {
+        if (self.buffer.items.len <= 1) {
+            return;
+        }
 
-    _ = SDL.SDL_RenderTexture(renderer, texture, null, &rect_dst);
-}
+        const surface = SDL.TTF_RenderText_Blended(font, self.buffer.items.ptr, 0, .{ .r = 255, .g = 255, .b = 255, .a = 255 });
+        defer SDL.SDL_DestroySurface(surface);
+
+        const texture = SDL.SDL_CreateTextureFromSurface(renderer, surface);
+        defer SDL.SDL_DestroyTexture(texture);
+
+        const rect_dst: SDL.SDL_FRect = .{ .x = 0, .y = 0, .w = @floatFromInt(surface.*.w), .h = @floatFromInt(surface.*.h) };
+
+        _ = SDL.SDL_RenderTexture(renderer, texture, null, &rect_dst);
+    }
+
+    pub fn append(self: *Editor, string: []const u8) !void {
+        _ = self.buffer.pop();
+        try self.buffer.appendSlice(self.allocator, string);
+        try self.buffer.append(self.allocator, 0);
+    }
+
+    pub fn backspace(self: *Editor) !void {
+        if (self.buffer.items.len <= 1) {
+            return;
+        }
+        _ = self.buffer.pop();
+        _ = self.buffer.pop();
+        try self.buffer.append(self.allocator, 0);
+    }
+
+    pub fn deinit(self: *Editor) void {
+        self.buffer.deinit(self.allocator);
+    }
+};

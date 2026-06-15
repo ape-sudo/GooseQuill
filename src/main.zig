@@ -1,11 +1,9 @@
 const std = @import("std");
 
 const SDL = @import("./sdl.zig").SDL;
-const editor = @import("./editor.zig");
+const Editor = @import("./editor.zig").Editor;
 
-pub fn main(_init: std.process.Init) !void {
-    _ = _init; // autofix
-
+pub fn main(init: std.process.Init) !void {
     const WIDTH = 800;
     const HEIGHT = 600;
 
@@ -41,18 +39,43 @@ pub fn main(_init: std.process.Init) !void {
 
     var window_should_close: bool = false;
 
+    if (!SDL.SDL_StartTextInput(window)) {
+        std.debug.print("Error starting text input: {s}\n", .{SDL.SDL_GetError()});
+        return error.SDL_StartTextInputFailed;
+    }
+    defer {
+        if (!SDL.SDL_StopTextInput(window)) {
+            std.debug.print("Error stopping text input: {s}\n", .{SDL.SDL_GetError()});
+        }
+    }
+
+    const arena = init.arena.allocator();
+
+    var editor = try Editor.init(arena);
+    defer editor.deinit();
+
     while (!window_should_close) {
         var event: SDL.SDL_Event = undefined;
         while (SDL.SDL_PollEvent(&event)) {
-            if (event.type == SDL.SDL_EVENT_QUIT) {
-                window_should_close = true;
+            switch (event.type) {
+                SDL.SDL_EVENT_QUIT => window_should_close = true,
+                SDL.SDL_EVENT_KEY_DOWN => {
+                    switch (event.key.scancode) {
+                        SDL.SDL_SCANCODE_BACKSPACE => try editor.backspace(),
+                        else => {},
+                    }
+                },
+                SDL.SDL_EVENT_TEXT_INPUT => {
+                    try editor.append(std.mem.span(event.text.text));
+                },
+                else => {},
             }
         }
 
         _ = SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         _ = SDL.SDL_RenderClear(renderer);
 
-        editor.draw(renderer, font);
+        try editor.draw(renderer, font);
 
         _ = SDL.SDL_RenderPresent(renderer);
     }
