@@ -1,82 +1,59 @@
 const std = @import("std");
 
-pub const c = @cImport({
-    @cInclude("SDL3/SDL.h");
-    @cInclude("SDL3_ttf/SDL_ttf.h");
-});
+const SDL = @import("./sdl.zig").SDL;
+const editor = @import("./editor.zig");
 
-const gq = @import("GooseQuill");
-
-pub fn main() u8 {
-    gq.hello_world();
+pub fn main(_init: std.process.Init) !void {
+    _ = _init; // autofix
 
     const WIDTH = 800;
     const HEIGHT = 600;
 
-    if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
-        std.debug.print("CANNOT INIT SDL: {s}\n", .{c.SDL_GetError()});
-        return 1;
+    if (!SDL.SDL_Init(SDL.SDL_INIT_VIDEO)) {
+        std.debug.print("CANNOT INIT SDL: {s}\n", .{SDL.SDL_GetError()});
+        return error.SDLInitFailed;
     }
+    defer SDL.SDL_Quit();
 
-    const window = c.SDL_CreateWindow("GooseQuill", WIDTH, HEIGHT, 0);
-
+    const window = SDL.SDL_CreateWindow("GooseQuill", WIDTH, HEIGHT, 0);
     if (window == null) {
         std.debug.print("CANNOT CREATE WINDOW\n", .{});
-        return 1;
+        return error.SDLCreateWindowFailed;
     }
+    defer SDL.SDL_DestroyWindow(window);
 
-    const renderer = c.SDL_CreateRenderer(window, null);
-
-    if (renderer == null) {
-        std.debug.print("CANNOT CREATE REDNERED\n", .{});
-        return 1;
-    }
+    const renderer = SDL.SDL_CreateRenderer(window, null) orelse return error.SDLCReateRendererFailed;
+    defer SDL.SDL_DestroyRenderer(renderer);
 
     const font_path = "main_font.ttf";
 
-    if (!c.TTF_Init()) {
-        std.debug.print("TTF_Init failed: {s}\n", .{c.SDL_GetError()});
-        return 1;
+    if (!SDL.TTF_Init()) {
+        std.debug.print("TTF_Init failed: {s}\n", .{SDL.SDL_GetError()});
+        return error.TTFInitFailed;
     }
+    defer SDL.TTF_Quit();
 
-    const font = c.TTF_OpenFont(font_path, 22);
-    if (font == null) {
-        std.debug.print("TTF_OpenFont failed: {s}\n", .{c.SDL_GetError()});
-        return 1;
-    }
-
-    const surface = c.TTF_RenderText_Blended(font, "Hello World", 0, .{ .r = 255, .g = 255, .b = 255, .a = 255 });
-
-    const texture = c.SDL_CreateTextureFromSurface(renderer, surface);
-
-    const rect_dst: c.SDL_FRect = .{ .x = 10, .y = 10, .w = @floatFromInt(surface.*.w), .h = @floatFromInt(surface.*.h) };
+    const font = SDL.TTF_OpenFont(font_path, 22) orelse {
+        std.debug.print("TTF_OpenFont failed: {s}\n", .{SDL.SDL_GetError()});
+        return error.TTFOpenFontFailed;
+    };
+    defer SDL.TTF_CloseFont(font);
 
     var window_should_close: bool = false;
 
     while (!window_should_close) {
-        var event: c.SDL_Event = undefined;
-        while (c.SDL_PollEvent(&event)) {
-            if (event.type == c.SDL_EVENT_QUIT) {
+        var event: SDL.SDL_Event = undefined;
+        while (SDL.SDL_PollEvent(&event)) {
+            if (event.type == SDL.SDL_EVENT_QUIT) {
                 window_should_close = true;
             }
         }
 
-        _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        _ = c.SDL_RenderClear(renderer);
+        _ = SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        _ = SDL.SDL_RenderClear(renderer);
 
-        _ = c.SDL_RenderTexture(renderer, texture, null, &rect_dst);
+        editor.draw(renderer, font);
 
-        _ = c.SDL_RenderPresent(renderer);
+        _ = SDL.SDL_RenderPresent(renderer);
     }
-
-    c.SDL_DestroyTexture(texture);
-    c.SDL_DestroySurface(surface);
-    c.TTF_CloseFont(font);
-
-    c.SDL_DestroyRenderer(renderer);
-    c.SDL_DestroyWindow(window);
-
-    c.TTF_Quit();
-    c.SDL_Quit();
-    return 0;
 }
