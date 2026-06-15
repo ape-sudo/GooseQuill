@@ -33,6 +33,20 @@ pub const Editor = struct {
         try self.buffer.append(self.allocator, 0);
     }
 
+    pub fn loadFile(self: *Editor, io: std.Io, path: []const u8) !void {
+        const Dir = std.Io.Dir;
+        const dir = Dir.cwd();
+
+        const content = try Dir.readFileAlloc(dir, io, path, self.allocator, std.Io.Limit.limited(std.math.maxInt(usize)));
+
+        defer self.allocator.free(content);
+
+        self.buffer.clearRetainingCapacity();
+
+        try self.buffer.appendSlice(self.allocator, content);
+        try self.buffer.append(self.allocator, 0);
+    }
+
     pub fn backspace(self: *Editor) !void {
         if (self.buffer.items.len <= 1) {
             return;
