@@ -52,6 +52,8 @@ pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
 
     var editor = try Editor.init(arena);
+    try editor.loadFile(init.io, "foo.rb");
+
     defer editor.deinit();
 
     while (!window_should_close) {
