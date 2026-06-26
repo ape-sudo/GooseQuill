@@ -58,12 +58,16 @@ pub fn main(init: std.process.Init) !void {
     defer editor.deinit();
 
     var cp = try CommandPrompt.init(arena);
-    try cp.append("ENTER COMMAND: ");
+    try cp.set_prompt("enter command: ");
+    try cp.set_prompt("enter command: ");
     defer cp.deinit();
 
     var command_prompt_on = false;
 
+    var error_until: u64 = 0;
+
     while (!window_should_close) {
+        std.debug.print("error unitl {}, ticks: {}\n", .{error_until, SDL.SDL_GetTicks()});
         var event: SDL.SDL_Event = undefined;
         while (SDL.SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -73,9 +77,33 @@ pub fn main(init: std.process.Init) !void {
 
                     if ((mods & SDL.SDL_KMOD_ALT) != 0 and event.key.scancode == SDL.SDL_SCANCODE_X) {
                         command_prompt_on = !command_prompt_on;
+                    } else if (event.key.scancode == SDL.SDL_SCANCODE_RETURN) {
+                        std.debug.print("SESSA", .{});
+                        const slice = cp.buffer.items[0 .. cp.buffer.items.len - 1];
+                        if (std.mem.eql(u8, "open_file", slice)) {
+                            try cp.set_prompt("file name: ");
+                            cp.buffer.clearRetainingCapacity();
+                            try cp.buffer.append(cp.allocator, 0);
+
+                            editor.loadFile(init.io, cp.buffer.items) catch {
+                                try cp.set_prompt("file not found...");
+                                error_until = SDL.SDL_GetTicks() + 500;
+                            };
+                        } else {
+                            try cp.set_prompt("command not found...");
+                            cp.buffer.clearRetainingCapacity();
+                            try cp.buffer.append(cp.allocator, 0);
+                            error_until = SDL.SDL_GetTicks() + 500;
+                        }
                     } else {
                         switch (event.key.scancode) {
-                            SDL.SDL_SCANCODE_BACKSPACE => try editor.backspace(),
+                            SDL.SDL_SCANCODE_BACKSPACE => {
+                                if (command_prompt_on) {
+                                    try cp.backspace();
+                                } else {
+                                    try editor.backspace();
+                                }
+                            },
                             else => {},
                         }
                     }
@@ -89,7 +117,14 @@ pub fn main(init: std.process.Init) !void {
                 },
                 else => {},
             }
-        }
+
+       }
+
+       if (command_prompt_on) {
+           if (SDL.SDL_GetTicks() >= error_until and error_until != 0) {
+               command_prompt_on = false;
+           }
+       }
 
         _ = SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         _ = SDL.SDL_RenderClear(renderer);
