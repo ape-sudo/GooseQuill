@@ -61,6 +61,11 @@ pub const CommandPrompt = struct {
         try self.prompt.append(self.allocator, 0);
     }
 
+    pub fn clear_buffer(self: *CommandPrompt) !void {
+        self.buffer.clearRetainingCapacity();
+        try self.buffer.append(self.allocator, 0);
+    }
+
     pub fn backspace(self: *CommandPrompt) !void {
         if (self.buffer.items.len <= 1) {
             return;

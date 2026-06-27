@@ -63,41 +63,42 @@ pub fn main(init: std.process.Init) !void {
     defer cp.deinit();
 
     var command_prompt_on = false;
-
     var error_until: u64 = 0;
     var waiting_for_command_args = false;
 
     while (!window_should_close) {
-        std.debug.print("error unitl {}, ticks: {}\n", .{error_until, SDL.SDL_GetTicks()});
         var event: SDL.SDL_Event = undefined;
         while (SDL.SDL_PollEvent(&event)) {
             switch (event.type) {
                 SDL.SDL_EVENT_QUIT => window_should_close = true,
                 SDL.SDL_EVENT_KEY_DOWN => {
-                    const mods = event.key.mod;
-
-                    if ((mods & SDL.SDL_KMOD_ALT) != 0 and event.key.scancode == SDL.SDL_SCANCODE_X) {
-                        command_prompt_on = !command_prompt_on;
+                    if (SDL.SDL_KMOD_ALT != 0 and event.key.scancode == SDL.SDL_SCANCODE_X) {
+                        std.debug.print("0\n", .{});
+                        command_prompt_on = true;
                     } else if (event.key.scancode == SDL.SDL_SCANCODE_RETURN) {
+                        std.debug.print("1\n", .{});
                         if (!waiting_for_command_args) {
+                            std.debug.print("2\n", .{});
                             const slice = cp.buffer.items[0 .. cp.buffer.items.len - 1];
                             if (std.mem.eql(u8, "open_file", slice)) {
                                 try cp.set_prompt("file name: ");
-                                cp.buffer.clearRetainingCapacity();
-                                try cp.buffer.append(cp.allocator, 0);
+                                try cp.clear_buffer();
                                 waiting_for_command_args = true;
                             } else {
                                 try cp.set_prompt("command not found...");
-                                cp.buffer.clearRetainingCapacity();
-                                try cp.buffer.append(cp.allocator, 0);
+                                try cp.clear_buffer();
                                 error_until = SDL.SDL_GetTicks() + 500;
                             }
                         } else {
                             if (event.key.scancode == SDL.SDL_SCANCODE_RETURN) {
-                                editor.loadFile(init.io, cp.buffer.items) catch {
+                                const slice = cp.buffer.items[0 .. cp.buffer.items.len - 1];
+                                editor.loadFile(init.io, slice) catch {
                                     try cp.set_prompt("file not found...");
                                     error_until = SDL.SDL_GetTicks() + 500;
                                 };
+                                command_prompt_on = false;
+                                try cp.set_prompt("enter command: ");
+                                try cp.clear_buffer();
                             }
                         }
                     } else {
@@ -129,6 +130,7 @@ pub fn main(init: std.process.Init) !void {
            if (SDL.SDL_GetTicks() >= error_until and error_until != 0) {
                command_prompt_on = false;
                waiting_for_command_args = false;
+               try cp.set_prompt("enter command: ");
            }
        }
 
