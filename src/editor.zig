@@ -1,14 +1,17 @@
 const std = @import("std");
 const SDL = @import("./sdl.zig").SDL;
+const Dir = std.Io.Dir;
 
 pub const Editor = struct {
     allocator: std.mem.Allocator,
     buffer: std.ArrayList(u8),
+    dir: std.Io.Dir,
+    absolute_path: []u8,
 
     pub fn init(allocator: std.mem.Allocator) !Editor {
         var buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
         try buffer.append(allocator, 0);
-        return Editor{ .buffer = buffer, .allocator = allocator };
+        return Editor{ .buffer = buffer, .allocator = allocator, .dir =  undefined, .absolute_path = &[_]u8{} };
     }
 
     pub fn draw(self: *Editor, renderer: *SDL.SDL_Renderer, font: *SDL.TTF_Font) !void {
@@ -34,10 +37,14 @@ pub const Editor = struct {
     }
 
     pub fn loadFile(self: *Editor, io: std.Io, path: []const u8) !void {
-        const Dir = std.Io.Dir;
-        const dir = Dir.cwd();
+        self.dir = Dir.cwd();
+        if (self.absolute_path.len > 0) {
+            self.allocator.free(self.absolute_path);
+        }
 
-        const content = try Dir.readFileAlloc(dir, io, path, self.allocator, std.Io.Limit.limited(std.math.maxInt(usize)));
+        self.absolute_path = try self.dir.realPathFileAlloc(io, path, self.allocator);
+
+        const content = try Dir.readFileAlloc(self.dir, io, path, self.allocator, std.Io.Limit.limited(std.math.maxInt(usize)));
 
         defer self.allocator.free(content);
 
