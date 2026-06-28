@@ -114,6 +114,8 @@ pub fn main(init: std.process.Init) !void {
                                         };
                                       },
                                       Command.save_file => {
+                                          const path = cp.buffer.items[0 .. cp.buffer.items.len - 1];
+                                          try editor.saveFile(init.io, path);
                                           std.debug.print("SAVING FILE", .{});
                                       },
                                       else => {}

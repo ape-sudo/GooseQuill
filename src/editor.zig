@@ -54,6 +54,13 @@ pub const Editor = struct {
         try self.buffer.append(self.allocator, 0);
     }
 
+    pub fn saveFile(self: *Editor, io: std.Io, path: []const u8) !void {
+        _ = try Dir.writeFile(.cwd(), io, .{
+            .sub_path = path,
+           .data = self.buffer.items[0 .. self.buffer.items.len - 1]
+        });
+    }
+
     pub fn backspace(self: *Editor) !void {
         if (self.buffer.items.len <= 1) {
             return;
